@@ -1,0 +1,7 @@
+# State holds the DB password in plain text: never commit it
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+*.tfvars
