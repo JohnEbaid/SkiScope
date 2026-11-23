@@ -33,11 +33,15 @@ jobs:
       - name: Check the AWS stack is up
         id: infra
         run: |
-          if aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1; then
+          # Skip only when the repo is genuinely missing; any other error (e.g. AccessDenied) must fail the run
+          if out=$(aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" 2>&1); then
             echo "up=true" >> "$GITHUB_OUTPUT"
-          else
+          elif echo "$out" | grep -q RepositoryNotFoundException; then
             echo "::warning::ECR repository not found - AWS stack is destroyed. Skipping build and deploy."
             echo "up=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$out"
+            exit 1
           fi
 
       - name: Log in to ECR
