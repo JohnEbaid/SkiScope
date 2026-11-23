@@ -41,7 +41,10 @@
         "iam:DeleteRole",
         "iam:GetRole",
         "iam:UpdateRole",
+        "iam:UpdateAssumeRolePolicy",
         "iam:TagRole",
+        "iam:UntagRole",
+        "iam:ListRoleTags",
         "iam:PassRole",
         "iam:PutRolePolicy",
         "iam:GetRolePolicy",
@@ -53,6 +56,9 @@
         "iam:ListInstanceProfilesForRole",
         "iam:CreateOpenIDConnectProvider",
         "iam:GetOpenIDConnectProvider",
+        "iam:TagOpenIDConnectProvider",
+        "iam:UntagOpenIDConnectProvider",
+        "iam:ListOpenIDConnectProviderTags",
         "iam:DeleteOpenIDConnectProvider"
       ],
       "Resource": [

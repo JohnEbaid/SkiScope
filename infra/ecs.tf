@@ -41,6 +41,11 @@ resource "aws_ecs_express_gateway_service" "app" {
     }]
   }
 
+  # GitHub Actions deploys new image tags after the first apply; don't let Terraform revert them
+  lifecycle {
+    ignore_changes = [primary_container[0].image]
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.ecs_execution,
     aws_iam_role_policy_attachment.ecs_infrastructure,

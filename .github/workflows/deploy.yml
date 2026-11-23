@@ -1,0 +1,70 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # lets the job request a short-lived OIDC token from GitHub
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: skiscope
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No AWS keys anywhere: AWS exchanges GitHub's OIDC token for temporary credentials
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # The AWS stack is destroyed between work sessions to save money
+      - name: Check the AWS stack is up
+        id: infra
+        run: |
+          if aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1; then
+            echo "up=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::ECR repository not found - AWS stack is destroyed. Skipping build and deploy."
+            echo "up=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to ECR
+        if: steps.infra.outputs.up == 'true'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        if: steps.infra.outputs.up == 'true'
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY"
+          docker build -t "$IMAGE:$GITHUB_SHA" -t "$IMAGE:latest" .
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:latest"
+          echo "IMAGE=$IMAGE:$GITHUB_SHA" >> "$GITHUB_ENV"
+
+      - name: Redeploy ECS service
+        if: steps.infra.outputs.up == 'true'
+        run: |
+          SERVICE_ARN=$(aws ecs list-services --cluster default \
+            --query "serviceArns[?contains(@, '/skiscope')] | [0]" --output text)
+          if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" = "None" ]; then
+            echo "::warning::No ECS service yet. Image pushed, nothing to redeploy."
+            exit 0
+          fi
+          aws ecs update-express-gateway-service \
+            --service-arn "$SERVICE_ARN" \
+            --primary-container "image=$IMAGE"
