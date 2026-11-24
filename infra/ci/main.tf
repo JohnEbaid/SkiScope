@@ -88,6 +88,7 @@ resource "aws_iam_role_policy" "deploy" {
           "ecr:UploadLayerPart",
           "ecr:CompleteLayerUpload",
           "ecr:PutImage",
+          "ecr:BatchGetImage", # docker push HEADs the manifest before and after upload
         ]
         Resource = "arn:aws:ecr:${var.region}:${data.aws_caller_identity.current.account_id}:repository/skiscope"
       },
@@ -103,6 +104,18 @@ resource "aws_iam_role_policy" "deploy" {
           "ecs:UpdateExpressGatewayService",
         ]
         Resource = "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:*"
+      },
+      {
+        # An update registers a new task definition revision for the service
+        Sid    = "TaskDefinitionRevisions"
+        Effect = "Allow"
+        Action = [
+          "ecs:RegisterTaskDefinition",
+          "ecs:DescribeTaskDefinition",
+          "ecs:DeregisterTaskDefinition",
+          "ecs:TagResource",
+        ]
+        Resource = "arn:aws:ecs:${var.region}:${data.aws_caller_identity.current.account_id}:task-definition/default-skiscope:*"
       },
       {
         # An update re-passes the service's roles to ECS; allow only our two roles, only to ECS
